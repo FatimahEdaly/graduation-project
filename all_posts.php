@@ -46,7 +46,7 @@ $stmt->close();
 
 <header class="bg-gray-900/90 p-6 shadow-2xl border-b border-yellow-500/30 sticky top-0 z-50 backdrop-blur-md flex justify-between items-center px-10">
     <h1 class="text-2xl font-black text-yellow-500 tracking-tighter uppercase">CHEF-LINK</h1>
-    <a href="student_dashboard.php" class="text-sm bg-gray-800 hover:bg-yellow-500 hover:text-black px-4 py-2 rounded-xl transition-all font-bold flex items-center gap-2">
+    <a href="student_posts.php" class="text-sm bg-gray-800 hover:bg-yellow-500 hover:text-black px-4 py-2 rounded-xl transition-all font-bold flex items-center gap-2">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
         </svg>
