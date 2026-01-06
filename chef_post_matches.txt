@@ -1,0 +1,19 @@
+CREATE TABLE chef_post_matches (
+    id INT(11) NOT NULL AUTO_INCREMENT,
+    graduate_id VARCHAR(20) NOT NULL,
+    post_id INT(11) NOT NULL,
+    similarity_score DECIMAL(4,3) NOT NULL COMMENT 'درجة تشابه جيب التمام بين 0 و 1',
+    inserted_to_page TINYINT(1) DEFAULT 0,
+    matched_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (id),
+
+    -- منع تكرار نفس الطالب مع نفس المنشور
+    UNIQUE KEY unique_match (graduate_id, post_id),
+
+    -- فهارس لتحسين الأداء
+    KEY idx_graduate_id (graduate_id),
+    KEY idx_post_id (post_id)
+) ENGINE=InnoDB
+DEFAULT CHARSET=utf8mb4
+COLLATE=utf8mb4_general_ci;
