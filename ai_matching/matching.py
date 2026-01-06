@@ -54,8 +54,8 @@ def run_silent_matching():
                 for skill in all_skills:
                     similarity = float(util.cos_sim(skill['skill_vec'], chunk_vec))
 
-                    # الثريشود المعتمد 0.60 لضمان دقة عالية
-                    if similarity >= 0.60:
+                    # الثريشود المعتمد 0.70 لضمان دقة عالية
+                    if similarity >= 0.70:
                         sid = skill['sid']
                         if sid not in best_match_for_student or similarity > best_match_for_student[sid]['score']:
                             best_match_for_student[sid] = {'score': similarity}
