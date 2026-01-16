@@ -2,29 +2,36 @@
 session_start();
 require_once 'config.php';
 
-// --- الجزء الأول: منطق التفاعل ---
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json');
     $student_id = $_SESSION['user_id'];
     $post_id = intval($_POST['post_id']);
     
+    $updateStmt = $conn->prepare("UPDATE chef_post_matches SET is_visible = 0 WHERE graduate_id = ? AND post_id = ?");
+    $updateStmt->bind_param("si", $student_id, $post_id);
+    $updateStmt->execute();
+    $updateStmt->close();
+
+    $success = false;
     if ($_POST['action'] === 'interested') {
-        $stmt = $conn->prepare("UPDATE chef_post_matches SET is_interested = 1 WHERE graduate_id = ? AND post_id = ?");
+        $stmt = $conn->prepare("INSERT INTO student_post_interested (graduate_id, post_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE graduate_id = graduate_id");
+        $stmt->bind_param("si", $student_id, $post_id);
+        $success = $stmt->execute();
+        $stmt->close();
     } elseif ($_POST['action'] === 'not_interested') {
-        $stmt = $conn->prepare("UPDATE chef_post_matches SET is_interested = 0 WHERE graduate_id = ? AND post_id = ?");
+        $success = true; 
     }
     
-    $stmt->bind_param("si", $student_id, $post_id);
-    if ($stmt->execute()) {
+    if ($success) {
         echo json_encode(['status' => 'success']);
     } else {
         echo json_encode(['status' => 'error']);
     }
-    $stmt->close();
     exit;
 }
 
-// --- الجزء الثاني: جلب بيانات العرض ---
+
 if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'student') {
     header("Location: login.php");
     exit;
@@ -39,11 +46,15 @@ $stmtStudent->execute();
 $student = $stmtStudent->get_result()->fetch_assoc();
 $stmtStudent->close();
 
-$sqlAds = "SELECT sp.id AS post_id, sp.content, sp.post_url, sp.platform, cpm.similarity_score, cpm.matched_at
+$sqlAds = "SELECT sp.id AS post_id, sp.content, sp.post_url, sp.platform, 
+           cpm.similarity_score, cpm.matched_at,
+           re.full_name AS est_name, re.type AS est_type, 
+           re.location_description, re.latitude, re.longitude
 FROM chef_post_matches cpm
 JOIN social_posts sp ON sp.id = cpm.post_id
+LEFT JOIN registered_establishments re ON sp.establishment_id = re.id
 WHERE cpm.graduate_id = ? 
-AND cpm.is_interested IS NULL
+AND cpm.is_visible = 1
 ORDER BY cpm.similarity_score DESC, cpm.matched_at DESC";
 
 $stmtAds = $conn->prepare($sqlAds);
@@ -72,23 +83,25 @@ $stmtAds->close();
         }
         .glass-card { background: rgba(31, 41, 55, 0.6); backdrop-filter: blur(8px); border: 1px solid rgba(75, 85, 99, 0.4); transition: all 0.4s ease; }
         .bottom-left-chef { position: fixed; bottom: 0; left: 0; z-index: 100; width: 250px; pointer-events: none; }
-        
-        /* أزرار الهوفر */
         .btn-base { background-color: rgba(55, 65, 81, 0.3); border: 1px solid rgba(75, 85, 99, 0.4); color: #9ca3af; transition: all 0.3s ease; }
         .btn-interested:hover { background-color: #10b981; color: white; border-color: #10b981; }
         .btn-not-interested:hover { background-color: #ef4444; color: white; border-color: #ef4444; }
         .btn-details:hover { background-color: #f59e0b; color: #000; border-color: #f59e0b; }
-        
+        #detailsModal { transition: all 0.3s ease; }
+        .modal-hidden { opacity: 0; pointer-events: none; transform: scale(0.95); }
+        .modal-visible { opacity: 1; pointer-events: auto; transform: scale(1); }
+        .custom-scroll { max-height: 350px; overflow-y: auto; }
+        .custom-scroll::-webkit-scrollbar { width: 5px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #1f2937; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #f59e0b; border-radius: 5px; }
     </style>
 </head>
 <body class="text-white min-h-screen pb-24 relative">
 
-<div class="bottom-left-chef">
-    <img src="images/girl.png" alt="Chef Character" class="w-full h-auto drop-shadow-2xl">
-</div>
+<div class="bottom-left-chef"><img src="images/girl.png" alt="Chef" class="w-full h-auto drop-shadow-2xl"></div>
 
 <div class="fixed top-24 right-6 z-50 hidden md:block">
-    <a href="all_posts.php" class="flex items-center gap-3 bg-gray-900/90 backdrop-blur-md border-r-4 border-yellow-500 text-white px-6 py-4 rounded-xl shadow-2xl hover:bg-yellow-500 hover:text-black transition-all duration-300 group">
+    <a href="all_posts.php" class="flex items-center gap-3 bg-gray-900/90 backdrop-blur-md border-r-4 border-yellow-500 text-white px-6 py-4 rounded-xl shadow-2xl hover:bg-yellow-500 hover:text-black transition-all duration-300">
         <span class="text-base font-bold">استكشاف كافة الإعلانات</span>
     </a>
 </div>
@@ -99,17 +112,12 @@ $stmtAds->close();
             <div class="h-8 w-8 bg-yellow-500/20 rounded-full flex items-center justify-center text-xl">👨‍🍳</div>
             <p class="text-sm font-black text-yellow-500"><?= htmlspecialchars($student['full_name']) ?></p>
         </a>
-
-        <h1 class="text-xl md:text-2xl font-black text-yellow-500 tracking-widest uppercase absolute left-1/2 -translate-x-1/2">CHEF-LINK</h1>
-
-        <a href="waiting_list.php" class="bg-gray-800 hover:bg-green-600 text-green-500 hover:text-white border border-green-500/30 px-4 py-2 rounded-xl transition-all font-bold text-xs">
-            <span>⭐ المهتم بها</span>
-        </a>
+        <h1 class="text-xl md:text-2xl font-black text-yellow-500 uppercase absolute left-1/2 -translate-x-1/2">CHEF-LINK</h1>
+        <a href="waiting_list.php" class="bg-gray-800 hover:bg-green-600 text-green-500 hover:text-white border border-green-500/30 px-4 py-2 rounded-xl transition-all font-bold text-xs">⭐ المهتم بها</a>
     </div>
 </header>
 
 <main class="max-w-4xl mx-auto p-6 space-y-8 mt-4">
-    
     <div class="bg-gray-900 p-8 rounded-[2rem] border-r-[10px] border-yellow-500 shadow-2xl flex flex-col gap-8 relative overflow-hidden">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
             <div>
@@ -121,58 +129,58 @@ $stmtAds->close();
                 <span class="text-xs uppercase font-bold tracking-tighter">Matched</span>
             </div>
         </div>
+    </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
-            <div class="bg-gray-800/50 p-5 rounded-2xl border border-gray-700/50 group hover:border-yellow-500/30 transition-all">
-                <h4 class="text-yellow-500 text-xs font-black mb-2 uppercase tracking-widest">مهاراتك الحالية:</h4>
-                <p class="text-gray-200 text-lg italic font-medium leading-relaxed">"<?= htmlspecialchars($student['skills']) ?>"</p>
-            </div>
-
-            <div class="bg-blue-900/10 p-5 rounded-2xl border border-blue-500/20">
-                <div class="flex items-start gap-3 text-blue-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mt-1" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-                    </svg>
-                    <div>
-                        <h4 class="text-xs font-black mb-1 uppercase tracking-widest text-blue-300">نصيحة تقنية للمطابقة:</h4>
-                        <p class="text-gray-300 text-sm leading-relaxed">يرجى التأكد من كتابة مهاراتك بدقة مع <span class="text-blue-300 font-bold underline">وضع فاصلة (،) بين كل مهارة</span>.</p>
-                    </div>
-                </div>
-            </div>
+    <div class="bg-blue-600/20 p-6 rounded-3xl border border-blue-500/30 backdrop-blur-sm">
+        <div class="flex items-center gap-4 mb-4">
+            <div class="h-10 w-10 bg-blue-500 rounded-full flex items-center justify-center text-xl">💡</div>
+            <h3 class="text-xl font-bold text-blue-400">تحليل مهاراتك الحالية</h3>
         </div>
+        <p class="text-gray-300 leading-relaxed italic">
+    "يقوم نظامنا الذكي حالياً بتحليل مهاراتك: <span class="text-blue-400 font-bold"><?= htmlspecialchars($student['skills']) ?></span> ومطابقتها مع الفرص المتاحة. لضمان أدق النتائج، <span class="text-red font-bold ">احرص على إضافة كافة مهاراتك في ملفك الشخصي وكتابتها مفصولة بفواصل (،)</span>."
+</p>
     </div>
 
     <div id="matches-container" class="grid gap-8">
-        <?php if (empty($ads)): ?>
-            <div class="text-center py-24 bg-gray-900/20 rounded-3xl border-2 border-dashed border-gray-800 text-gray-400 text-lg italic">لا توجد وظائف جديدة مطابقة لمهاراتك حالياً..</div>
-        <?php else: ?>
-            <?php foreach ($ads as $ad): ?>
-                <div class="glass-card p-8 rounded-[2.5rem] group relative" id="card-<?= $ad['post_id'] ?>">
-                    <div class="flex justify-between items-start mb-6">
-                        <div class="w-full max-w-[250px]">
-                            <div class="flex justify-between text-xs mb-2 font-black text-yellow-500 uppercase tracking-tighter">
-                                <span>قوة المطابقة</span>
-                                <span><?= number_format($ad['similarity_score'] * 100, 0) ?>%</span>
-                            </div>
-                            <div class="score-bar"><div class="score-fill" style="width: <?= $ad['similarity_score'] * 100 ?>%"></div></div>
+        <?php foreach ($ads as $ad): ?>
+            <div class="glass-card p-8 rounded-[2.5rem] group relative" id="card-<?= $ad['post_id'] ?>">
+                <div class="flex justify-between items-start mb-6">
+                    <div class="w-full max-w-[250px]">
+                        <div class="flex justify-between text-xs mb-2 font-black text-yellow-500">
+                            <span>قوة المطابقة</span>
+                            <span><?= number_format($ad['similarity_score'] * 100, 0) ?>%</span>
                         </div>
-                        <span class="text-xs text-yellow-500/60 uppercase font-black tracking-widest"><?= htmlspecialchars($ad['platform']) ?></span>
-                    </div>
-
-                    <div class="text-gray-200 text-lg leading-relaxed mb-8 pr-6 border-r-4 border-gray-700">
-                        <?= nl2br(htmlspecialchars($ad['content'])) ?>
-                    </div>
-
-                    <div class="flex flex-col sm:flex-row items-center gap-4">
-                        <button onclick="handleResponse(<?= $ad['post_id'] ?>, 'interested')" class="flex-1 w-full py-4 rounded-2xl font-black transition-all btn-base btn-interested">👍 مهتم</button>
-                        <button onclick="handleResponse(<?= $ad['post_id'] ?>, 'not_interested')" class="flex-1 w-full py-4 rounded-2xl font-black transition-all btn-base btn-not-interested">👎 غير مهتم</button>
-                        <a href="<?= htmlspecialchars($ad['post_url']) ?>" target="_blank" class="flex-1 w-full py-4 rounded-2xl font-black text-center transition-all btn-base btn-details">🔗 التفاصيل</a>
+                        <div class="score-bar"><div class="score-fill" style="width: <?= $ad['similarity_score'] * 100 ?>%"></div></div>
                     </div>
                 </div>
-            <?php endforeach; ?>
-        <?php endif; ?>
+                <div class="text-gray-200 text-lg leading-relaxed mb-8 pr-6 border-r-4 border-gray-700">
+                    <?= nl2br(htmlspecialchars($ad['content'])) ?>
+                </div>
+                <div class="flex flex-col sm:flex-row items-center gap-4">
+                    <button onclick="handleResponse(<?= $ad['post_id'] ?>, 'interested')" class="flex-1 w-full py-4 rounded-2xl font-black btn-base btn-interested">👍 مهتم</button>
+                    <button onclick="handleResponse(<?= $ad['post_id'] ?>, 'not_interested')" class="flex-1 w-full py-4 rounded-2xl font-black btn-base btn-not-interested">👎 غير مهتم</button>
+                    <button onclick='openDetails(<?= json_encode($ad) ?>)' class="flex-1 w-full py-4 rounded-2xl font-black btn-base btn-details">🔗 التفاصيل</button>
+                </div>
+            </div>
+        <?php endforeach; ?>
     </div>
 </main>
+
+<div id="detailsModal" class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm modal-hidden">
+    <div class="bg-gray-900 border border-yellow-500 w-full max-w-2xl rounded-[2.5rem] overflow-hidden shadow-2xl">
+        <div class="bg-yellow-500 p-6 flex justify-between items-center text-black">
+            <h3 id="m-est-name" class="text-2xl font-black"></h3>
+            <button onclick="closeDetails()" class="text-3xl font-black">×</button>
+        </div>
+        <div class="p-8 space-y-6">
+            <p id="m-content" class="text-white leading-relaxed bg-gray-800/50 p-6 rounded-2xl custom-scroll"></p>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <a id="m-map-link" href="#" target="_blank" class="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black text-center">📍 الخريطة</a>
+                <a id="m-post-link" href="#" target="_blank" class="flex-1 bg-yellow-500 text-black py-4 rounded-2xl font-black text-center">🔗 الفيسبوك</a>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
 function handleResponse(postId, action) {
@@ -180,19 +188,52 @@ function handleResponse(postId, action) {
     const formData = new FormData();
     formData.append('post_id', postId);
     formData.append('action', action);
-
-    fetch('', { method: 'POST', body: formData })
-    .then(response => response.json())
-    .then(data => {
+    fetch('', { method: 'POST', body: formData }).then(r => r.json()).then(data => {
         if (data.status === 'success') {
             card.style.opacity = '0';
-            card.style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                card.remove();
-                if (document.querySelectorAll('.glass-card').length === 0) location.reload(); 
-            }, 300);
+            card.style.transform = 'translateX(100px)';
+            setTimeout(() => { card.remove(); if (!document.querySelector('.glass-card')) location.reload(); }, 500);
         }
     });
+}
+function openDetails(ad) {
+    document.getElementById('m-est-name').innerText = ad.est_name || 'مطعم';
+    document.getElementById('m-content').innerText = ad.content;
+    
+   
+    const platformNoticeId = 'm-platform-notice';
+    let noticeElem = document.getElementById(platformNoticeId);
+    
+    if (!noticeElem) {
+        noticeElem = document.createElement('div');
+        noticeElem.id = platformNoticeId;
+        noticeElem.className = "mb-4 p-3 bg-green-500/20 border border-green-500/50 rounded-xl text-green-400 text-xs font-bold flex items-center gap-2";
+        document.getElementById('m-content').before(noticeElem);
+    }
+
+ 
+    const facebookBtn = document.getElementById('m-post-link');
+
+   
+    if (ad.platform === 'Dashboard') {
+ 
+        noticeElem.innerHTML = "<span>🌐</span> هذا الإعلان تم نشره مباشرة عبر منصة شيف لينك";
+        noticeElem.style.display = 'flex';
+     
+        facebookBtn.style.display = 'none';
+    } else {
+  
+        noticeElem.style.display = 'none';
+    
+        facebookBtn.style.display = 'block'; 
+        facebookBtn.href = ad.post_url;
+    }
+
+    document.getElementById('m-map-link').href = `https://www.google.com/maps?q=${ad.latitude},${ad.longitude}`;
+    document.getElementById('detailsModal').classList.replace('modal-hidden', 'modal-visible');
+}
+function closeDetails() {
+    document.getElementById('detailsModal').classList.replace('modal-visible', 'modal-hidden');
 }
 </script>
 </body>

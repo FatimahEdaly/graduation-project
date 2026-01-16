@@ -1,5 +1,5 @@
 <?php
-// ==================== 1. بدء الجلسة والتجهيز ====================
+
 if (ob_get_level() === 0) ob_start(); 
 session_start();
 require_once 'config.php';
@@ -35,7 +35,7 @@ if (intval($establishment['is_first_login']) === 0) {
     exit;
 }
 
-// ==================== 2. معالجة طلبات AJAX (نفس منطق الطالب) ====================
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json');
     
@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $newFileName = 'res_'.$establishment_id.'_'.time().'.'.$ext;
         $uploadPath = $uploadDir.$newFileName;
 
-        // حذف الصورة القديمة
+       
         if (!empty($establishment['profile_image']) && file_exists(__DIR__.'/'.$establishment['profile_image'])) {
             unlink(__DIR__.'/'.$establishment['profile_image']);
         }
@@ -206,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 </div>
 
 <script>
-// رفع الصورة
+
 $('#uploadIcon').click(() => $('#profileInput').click());
 $('#profileInput').change(function() {
     const file = this.files[0];
@@ -219,7 +219,7 @@ $('#profileInput').change(function() {
     });
 });
 
-// إظهار المودالات
+
 $('#changePassBtn').click(() => $('#passModal').removeClass('hidden'));
 $('#addPostBtn').click(() => $('#postModal').removeClass('hidden'));
 
