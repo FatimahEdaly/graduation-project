@@ -1,0 +1,37 @@
+CREATE TABLE `chef_post_matches` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `graduate_id` varchar(20) NOT NULL,
+  `post_id` int(11) NOT NULL,
+  `similarity_score` decimal(4,3) NOT NULL COMMENT 'درجة تشابه جيب التمام بين 0 و 1',
+  `inserted_to_page` tinyint(1) DEFAULT 0,
+  `matched_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `is_visible` tinyint(1) DEFAULT 1,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_match` (`graduate_id`, `post_id`),
+  KEY `post_id` (`post_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+
+CREATE TABLE `student_post_interested` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `graduate_id` varchar(50) NOT NULL,
+  `post_id` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_student_post` (`graduate_id`, `post_id`),
+  KEY `post_id` (`post_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+
+
+CREATE TABLE `social_posts` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `establishment_id` int(11) DEFAULT NULL,
+  `platform` varchar(50) NOT NULL,
+  `post_url` varchar(255) NOT NULL,
+  `content` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `is_processed` tinyint(1) DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `fk_restaurant_post` (`establishment_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
